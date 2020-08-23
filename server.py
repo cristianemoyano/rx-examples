@@ -2,6 +2,8 @@
 RxPy Github repository searcher
 This lists the repositories that contains the keywords or language provided by the user
 To make it asynchronous I'm using Reactivex, tornado and the github API
+
+https://auth0.com/blog/reactive-programming-in-python/
 """
 import json
 import os
@@ -16,13 +18,15 @@ from tornado.web import Application, RequestHandler, StaticFileHandler, url
 from tornado.websocket import WebSocketHandler
 
 headers = conf.headers
-GIT_ORG = conf.GITHUB_API_URL+"/orgs"
+GIT_ORG = conf.GITHUB_API_URL + "/orgs"
 # Configure the Httpclient as a curlAsyncHttpClient
 AsyncHTTPClient.configure("tornado.curl_httpclient.CurlAsyncHTTPClient")
 
+
 class WSHandler(WebSocketHandler):
     orgs = conf.orgs
-    def get_org_repos(self,org):
+
+    def get_org_repos(self, org):
         """request the repos to the Github API"""
         http_client = AsyncHTTPClient()
         # Asynchronous request for contet
@@ -55,7 +59,7 @@ class WSHandler(WebSocketHandler):
         )
 
         interval_obs = Observable.interval(
-            60000  #refresh the value every 60 Seconds for periodic updates
+            60000  # refresh the value every 60 Seconds for periodic updates
         ).start_with(0)
 
         self.combine_latest_sbs = user_input.combine_latest(
@@ -76,9 +80,9 @@ class WSHandler(WebSocketHandler):
         self.combine_latest_sbs.dispose()
         print("WebSocket closed")
 
-    def get_info(self,req):
+    def get_info(self, req):
         """managing error codes and returning a list of json with content"""
-        if req.code ==200:
+        if req.code == 200:
             jsresponse = json.loads(req.body.decode("utf-8"))
             return jsresponse
         elif req.code == 403:
@@ -88,7 +92,7 @@ class WSHandler(WebSocketHandler):
         else:
             return json.dumps("failed")
 
-    def get_data(self,query):
+    def get_data(self, query):
         """ query the data to the API and return the contet filtered"""
         return Observable.from_list(
             self.orgs
@@ -98,21 +102,23 @@ class WSHandler(WebSocketHandler):
 
             lambda x: Observable.from_list(
 
-                    self.get_info(x) #transform the response to a json list
+                self.get_info(x)  # transform the response to a json list
 
             ).filter(
 
-                lambda val: (val.get("description") is not None and (val.get("description").lower()).find(query.lower())!= -1)
-                            or (val.get("language") is not None and (val.get("language").lower()).find(query.lower())!= -1)
-            ).take(10)  #just take 10 repos from each org
+                lambda val: (val.get("description") is not None and (
+                    val.get("description").lower()).find(query.lower()) != -1)
+                or (val.get("language") is not None and (val.get("language").lower()).find(query.lower()) != -1)
+            ).take(10)  # just take 10 repos from each org
 
         ).map(lambda x: {'name': x.get("name"), 'stars': str(x.get("stargazers_count")),
-                         'link': x.get("svn_url"),'description': x.get("description"), 'language': x.get("language")})
+                         'link': x.get("svn_url"), 'description': x.get("description"), 'language': x.get("language")})
 
 
 class MainHandler(RequestHandler):
     def get(self):
         self.render("index.html")
+
 
 def main():
     port = os.environ.get("PORT", 8080)
